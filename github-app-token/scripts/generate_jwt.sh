@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Generate a JWT for GitHub App authentication.
+# Generate a GitHub App Installation Access Token and authenticate the gh CLI
 #
 # Required environment variables:
-#   GITHUB_APP_ID       - The GitHub App's numeric ID
-#   GITHUB_APP_PEM_FILE - Path to the PEM-encoded private key file
-#
-# Prints the signed JWT to stdout.
+#   GITHUB_APP_ID              - The GitHub App's numeric ID
+#   GITHUB_APP_INSTALLATION_ID - The numeric Installation ID for the target org/user
+#   GITHUB_APP_PEM_FILE        - Path to the PEM-encoded private key file
 
 set -euo pipefail
 
 if [[ -z "${GITHUB_APP_ID:-}" ]]; then
   echo "error: GITHUB_APP_ID is not set" >&2
+  exit 1
+fi
+
+if [[ -z "${GITHUB_APP_INSTALLATION_ID:-}" ]]; then
+  echo "error: GITHUB_APP_INSTALLATION_ID is not set" >&2
   exit 1
 fi
 
@@ -24,18 +28,24 @@ if [[ ! -f "${GITHUB_APP_PEM_FILE}" ]]; then
   exit 1
 fi
 
-## Build JWT
+# Function to base64 encode with URL-safe characters
+b64enc() { openssl enc -base64 -A | tr '+/' '-_' | tr -d '='; }
 
-header=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+NOW=$(date +%s)
+# JWT valid for 10 minutes (GitHub limit)
+IAT=$NOW
+EXP=$((NOW + 10 * 60))
 
-now=$(date +%s)
-iat=$((now - 60))
-exp=$((now + 600))
+# Create the JWT header and payload (requires jq for compact formatting just to be safe)
+HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | jq -r -c .)
+PAYLOAD=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "${IAT}" "${EXP}" "${GITHUB_APP_ID}" | jq -r -c .)
 
-payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$iat" "$exp" "$GITHUB_APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+SIGNED_CONTENT=$(printf '%s' "${HEADER}" | b64enc).$(printf '%s' "${PAYLOAD}" | b64enc)
 
-unsigned="${header}.${payload}"
+# Sign the content with the private key
+SIG=$(printf '%s' "${SIGNED_CONTENT}" | openssl dgst -binary -sha256 -sign "${GITHUB_APP_PEM_FILE}" | b64enc)
 
-signature=$(printf '%s' "$unsigned" | openssl dgst -sha256 -sign "${GITHUB_APP_PEM_FILE}" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+JWT=$(printf '%s.%s' "${SIGNED_CONTENT}" "${SIG}")
 
-echo "${unsigned}.${signature}"
+# Echo the token to stdout as expected by the skill
+echo "${JWT}"

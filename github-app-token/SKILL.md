@@ -19,7 +19,7 @@ The following environment variables MUST be set before invoking this skill:
 
 If any variable is missing, stop and tell the user which ones are required.
 
-Requires `openssl`, `curl`, and `grep` (standard on macOS and Linux).
+Requires `openssl`, `curl`, `grep`, and `jq` (standard on modern environments).
 
 ## Steps
 
