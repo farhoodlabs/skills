@@ -23,44 +23,32 @@ Requires `openssl`, `curl`, `grep`, and `jq` (standard on modern environments).
 
 ## Steps
 
-### 1. Generate a JWT
+### 1. Generate and Export Token
 
-Run the helper script bundled with this skill:
-
-```bash
-TOKEN=$(bash /path/to/skills/github-app-token/scripts/generate_jwt.sh)
-```
-
-The JWT uses:
-- **Algorithm**: RS256
-- **Header**: `{"alg": "RS256", "typ": "JWT"}`
-- **Payload**:
-  - `iat`: current time minus 60 seconds (clock drift buffer)
-  - `exp`: current time plus 600 seconds (10 minute max)
-  - `iss`: the `GITHUB_APP_ID`
-
-### 2. Exchange the JWT for an installation access token
+Run the helper script and `eval` its output. This securely exports the short-lived GitHub installation access token as `GH_TOKEN` into your current process environment:
 
 ```bash
-RESPONSE=$(curl -s -X POST \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  "https://api.github.com/app/installations/${GITHUB_APP_INSTALLATION_ID}/access_tokens")
-
-INSTALL_TOKEN=$(echo "$RESPONSE" | grep -o '"token":"[^"]*"' | head -1 | cut -d'"' -f4)
+eval "$(/path/to/skills/github-app-token/scripts/generate_token.sh)"
 ```
 
-If the response contains an error (e.g., `401 Unauthorized`), check:
-1. The PEM key matches the App ID
-2. The Installation ID is valid for this App
-3. The system clock is accurate (JWT `iat`/`exp` are time-sensitive)
+> [!NOTE] 
+> Because this uses `eval`, the token is scoped only to the current terminal session, process, or script that executes it. For a CI/CD environment (like GitHub Actions), you can extract the token to pass it between steps like so:
+> `echo "GH_TOKEN=$(/path/to/skills/github-app-token/scripts/generate_token.sh | cut -d'"' -f2)" >> $GITHUB_ENV`
 
-### 3. Authenticate the gh CLI
+The script will:
+1. Generate a short-lived JWT using your App ID and PEM key
+2. Exchange the JWT to get a GitHub Installation Access Token
+3. Output the `export GH_TOKEN=...` command to set it in your environment.
+### 2. Authenticate the gh CLI
+
+With `GH_TOKEN` set, the `gh` CLI operates securely and without needing a separate authentication login for most API operations. Note that `gh auth status` may not reflect the token since it checks local config, but `gh` will respect the `GH_TOKEN` environment variable!
 
 ```bash
-echo "${INSTALL_TOKEN}" | gh auth login --with-token
+# Check that gh is working
+gh api user
 ```
+
+*(Alternatively, to specifically configure gh auth locally, you can use: `echo "${GH_TOKEN}" | gh auth login --with-token`)*
 
 Verify it worked:
 
@@ -76,7 +64,7 @@ The installation access token expires after 1 hour. There is nothing to revoke u
 
 ```bash
 curl -s -X DELETE \
-  -H "Authorization: Bearer ${INSTALL_TOKEN}" \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
   -H "Accept: application/vnd.github+json" \
   "https://api.github.com/installation/token"
 ```

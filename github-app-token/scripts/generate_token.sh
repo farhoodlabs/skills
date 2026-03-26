@@ -47,5 +47,20 @@ SIG=$(printf '%s' "${SIGNED_CONTENT}" | openssl dgst -binary -sha256 -sign "${GI
 
 JWT=$(printf '%s.%s' "${SIGNED_CONTENT}" "${SIG}")
 
-# Echo the token to stdout as expected by the skill
-echo "${JWT}"
+# Exchange JWT for an installation access token
+RESPONSE=$(curl -s -X POST \
+  -H "Authorization: Bearer ${JWT}" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/app/installations/${GITHUB_APP_INSTALLATION_ID}/access_tokens")
+
+INSTALL_TOKEN=$(printf '%s' "${RESPONSE}" | jq -r '.token // empty')
+
+if [[ -z "${INSTALL_TOKEN}" ]]; then
+  echo "error: failed to generate installation token" >&2
+  echo "${RESPONSE}" >&2
+  exit 1
+fi
+
+# Output the export command so it can be eval'd by the caller
+echo "export GH_TOKEN=\"${INSTALL_TOKEN}\""
