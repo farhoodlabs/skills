@@ -3,7 +3,7 @@
 
 Reads from environment variables:
   GITHUB_APP_ID       - The GitHub App's numeric ID
-  GITHUB_APP_PEM_FILE  - Path to the PEM-encoded private key file
+  GITHUB_APP_PEM_FILE - Path to the PEM-encoded private key file
 
 Prints the signed JWT to stdout.
 """
@@ -13,7 +13,6 @@ import os
 import sys
 import time
 import base64
-import hashlib
 
 try:
     from cryptography.hazmat.primitives import hashes, serialization
@@ -30,35 +29,23 @@ def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
-def sign_with_cryptography(unsigned: str, pem_key: str) -> str:
-    private_key = serialization.load_pem_private_key(pem_key.encode(), password=None)
+def sign_with_cryptography(unsigned: str, pem_contents: str) -> str:
+    """Sign using the cryptography library. Handles both PKCS#1 and PKCS#8 PEM formats."""
+    private_key = serialization.load_pem_private_key(pem_contents.encode(), password=None)
     signature = private_key.sign(unsigned.encode(), padding.PKCS1v15(), hashes.SHA256())
     return b64url(signature)
 
 
-def sign_with_openssl(unsigned: str, pem_key: str) -> str:
+def sign_with_openssl(unsigned: str, pem_file: str) -> str:
+    """Sign using the openssl CLI. Reads the key from the file path directly."""
     result = subprocess.run(
-        ["openssl", "dgst", "-sha256", "-sign", "/dev/stdin"],
-        input=pem_key.encode(),
+        ["openssl", "dgst", "-sha256", "-sign", pem_file, "-binary"],
+        input=unsigned.encode(),
         capture_output=True,
-        check=True,
-        env={**os.environ, "OPENSSL_CONF": "/dev/null"},
     )
-    # openssl dgst -sign reads key from stdin on some versions, but not all.
-    # If that fails, write to a temp file.
     if result.returncode != 0:
-        import tempfile
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
-            f.write(pem_key)
-            f.flush()
-            result = subprocess.run(
-                ["openssl", "dgst", "-sha256", "-sign", f.name],
-                input=unsigned.encode(),
-                capture_output=True,
-                check=True,
-            )
-            os.unlink(f.name)
+        print(f"error: openssl signing failed: {result.stderr.decode()}", file=sys.stderr)
+        sys.exit(1)
     return b64url(result.stdout)
 
 
@@ -76,9 +63,6 @@ def main():
         print(f"error: PEM file not found: {pem_file}", file=sys.stderr)
         sys.exit(1)
 
-    with open(pem_file, "r") as f:
-        pem_key = f.read()
-
     now = int(time.time())
     header = b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
     payload = b64url(
@@ -87,9 +71,11 @@ def main():
     unsigned = f"{header}.{payload}"
 
     if USE_CRYPTOGRAPHY:
-        signature = sign_with_cryptography(unsigned, pem_key)
+        with open(pem_file, "r") as f:
+            pem_contents = f.read()
+        signature = sign_with_cryptography(unsigned, pem_contents)
     else:
-        signature = sign_with_openssl(unsigned, pem_key)
+        signature = sign_with_openssl(unsigned, pem_file)
 
     print(f"{unsigned}.{signature}")
 
