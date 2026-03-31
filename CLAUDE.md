@@ -14,6 +14,7 @@ Each skill follows this convention:
 
 ## Current Skills
 
+- **`github-app-token`** — Documents how to generate short-lived GitHub App installation access tokens. Requires `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PEM_FILE` env vars. Inline commands only — no bundled scripts.
 - **`playwright-ephemeral`** — Provisions ephemeral Playwright MCP browser sessions as Kubernetes Jobs for E2E testing. Creates a Job + Service pair in a dedicated namespace, waits for readiness, and returns the MCP endpoint URL. Requires `kubectl` and appropriate RBAC.
 
 ## Key Patterns
