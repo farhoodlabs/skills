@@ -58,7 +58,5 @@ All three are standard Unix tools. No Python or Node required.
 ```
 minimax-image-generation/
 ├── SKILL.md          # Skill definition + user-facing docs
-├── scripts/
-│   └── generate.sh   # Generation script (CLI entry point)
 └── CLAUDE.md         # These implementation notes
 ```

@@ -4,25 +4,18 @@ Claude Code skill for generating images via the MiniMax API.
 Wraps the MiniMax `/v1/image_generation` endpoint as a `/minimax-image-generation` slash command.
 
 ## Structure
-- `SKILL.md` — skill definition (deployed to ~/.claude/skills/minimax-image-generation/)
-- `scripts/generate.sh` — image generation script
+- `SKILL.md` — skill definition + usage documentation
 - `CLAUDE.md` — implementation notes
 
-## Commands
-```bash
-bash scripts/generate.sh [options]
-```
-
 ## Rules
-- The generated image is written to disk as `output-0.jpeg` (and `output-1.jpeg`, etc. for multiple images)
 - Set `MINIMAX_API_KEY` env var before use
-- After edits: run `bash scripts/sync.sh` to deploy (if provided)
+- Images are written to disk as `output-0.jpeg`, `output-1.jpeg`, etc.
 
 ---
 name: minimax-image-generation
 version: "1.0.0"
 description: "Generate images from MiniMax's image-01 model. Triggered by phrases like 'generate image', 'create picture', 'minimax image', 'text to image'."
-argument-hint: '"a sunset over the ocean, cinematic" [--aspect-ratio=16:9] [--num-images=1] [--output=output.jpeg]'
+argument-hint: '"a sunset over the ocean, cinematic" [--aspect-ratio=16:9]'
 allowed-tools: Bash, Read, Write
 user-invocable: true
 metadata:
@@ -37,16 +30,14 @@ metadata:
     bins:
       - curl
       - jq
+      - base64
     primaryEnv: MINIMAX_API_KEY
-    files:
-      - "scripts/*"
     tags:
       - image
       - image-generation
       - generative-ai
       - minimax
       - text-to-image
-      - AI
 ---
 
 # MiniMax Image Generation
@@ -56,14 +47,8 @@ metadata:
 ## Quick Start
 
 ```bash
-# Set your API key
 export MINIMAX_API_KEY="your-minimax-api-key"
-
-# Generate an image
 /minimax-image-generation "a cat wearing a spacesuit, cinematic photography"
-
-# With options
-/minimax-image-generation "a sunset over the ocean" --aspect-ratio=16:9 --num-images=1 --output=sunset.jpeg
 ```
 
 ---
@@ -74,80 +59,44 @@ Extract from the user's input:
 
 1. **PROMPT**: The image description (required)
 2. **ASPECT_RATIO**: `16:9` (default), `1:1`, `9:16`, `4:3`, `3:4`
-3. **NUM_IMAGES**: Number of images to generate (1–4, default 1)
-4. **OUTPUT**: Output filename (default `output-{index}.jpeg`)
 
 ---
 
-## Step 1: Verify Credentials
+## API Call Example
 
 ```bash
+# Verify credentials
 if [ -z "${MINIMAX_API_KEY:-}" ]; then
   echo "ERROR: MINIMAX_API_KEY is not set."
-  echo "Set it with: export MINIMAX_API_KEY='your-api-key'"
   exit 1
 fi
 
 API_BASE_URL="${MINIMAX_API_BASE_URL:-https://api.minimax.io}"
-echo "Using API base: $API_BASE_URL"
-```
+PROMPT="<your prompt here>"
+ASPECT_RATIO="16:9"
 
----
-
-## Step 2: Call the MiniMax Image Generation API
-
-```bash
-PROMPT="a serene mountain landscape at dawn, cinematic, photorealistic"
-ASPECT_RATIO="${ASPECT_RATIO:-16:9}"
-NUM_IMAGES="${NUM_IMAGES:-1}"
-OUTPUT="${OUTPUT:-}"
-
-URL="${API_BASE_URL}/v1/image_generation"
-
-response=$(curl -s -X POST "${URL}" \
+# Call the API
+response=$(curl -s -X POST "${API_BASE_URL}/v1/image_generation" \
   -H "Authorization: Bearer ${MINIMAX_API_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
     \"model\": \"image-01\",
     \"prompt\": \"${PROMPT}\",
     \"aspect_ratio\": \"${ASPECT_RATIO}\",
-    \"num_images\": ${NUM_IMAGES},
     \"response_format\": \"base64\"
   }")
 
-# Check for errors
-if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
-  error_msg=$(echo "$response" | jq -r '.error.message // "Unknown error"')
-  echo "ERROR: $error_msg"
-  exit 1
-fi
-```
-
----
-
-## Step 3: Decode and Save Images
-
-```bash
+# Decode and save
 images=$(echo "$response" | jq -r '.data.image_base64[]')
-
 idx=0
 for image_b64 in $images; do
-  if [ -n "${OUTPUT}" ]; then
-    # Single output filename (use index if multiple images)
-    if [ "$NUM_IMAGES" -gt 1 ]; then
-      filename="${OUTPUT%.*}-${idx}.${OUTPUT##*.}"
-    else
-      filename="$OUTPUT"
-    fi
-  else
-    filename="output-${idx}.jpeg"
-  fi
-
-  echo "$image_b64" | base64 -d > "$filename"
-  echo "Saved: $filename"
+  echo "$image_b64" | base64 -d > "output-${idx}.jpeg"
+  echo "Saved: output-${idx}.jpeg"
   idx=$((idx + 1))
 done
 ```
+
+**Replace `<your prompt here>` with the user's image description.**
 
 ---
 
@@ -179,7 +128,6 @@ done
 | `model` | string | `image-01` | Model to use |
 | `prompt` | string | required | Image description |
 | `aspect_ratio` | string | `16:9` | Image aspect ratio |
-| `num_images` | integer | `1` | Number of images (1–4) |
 | `response_format` | string | `base64` | Output format |
 
 ---
@@ -190,8 +138,7 @@ done
 🎨 MiniMax Image Generation
 ├─ Prompt: "a cat wearing a spacesuit, cinematic photography"
 ├─ Aspect ratio: 16:9
-├─ Model: image-01
-└─ Generating...
+└─ Model: image-01
 
 Saved: output-0.jpeg
 Done.
