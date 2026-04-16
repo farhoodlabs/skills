@@ -6,8 +6,23 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # --- Validate required env vars ---
 [[ -z "${GITHUB_APP_ID:-}" ]]              && die "GITHUB_APP_ID is not set"
 [[ -z "${GITHUB_APP_INSTALLATION_ID:-}" ]] && die "GITHUB_APP_INSTALLATION_ID is not set"
-[[ -z "${GITHUB_APP_PEM_FILE:-}" ]]        && die "GITHUB_APP_PEM_FILE is not set"
-[[ ! -f "$GITHUB_APP_PEM_FILE" ]]          && die "PEM file not found: $GITHUB_APP_PEM_FILE"
+
+# Resolve PEM key: prefer GITHUB_APP_PEM (inline data), fall back to GITHUB_APP_PEM_FILE
+_CLEANUP_PEM_FILE=""
+if [[ -n "${GITHUB_APP_PEM:-}" ]]; then
+  _TMP_PEM=$(mktemp)
+  _CLEANUP_PEM_FILE="$_TMP_PEM"
+  printf '%s' "$GITHUB_APP_PEM" > "$_TMP_PEM"
+  chmod 600 "$_TMP_PEM"
+  GITHUB_APP_PEM_FILE="$_TMP_PEM"
+elif [[ -n "${GITHUB_APP_PEM_FILE:-}" ]]; then
+  [[ ! -f "$GITHUB_APP_PEM_FILE" ]] && die "PEM file not found: $GITHUB_APP_PEM_FILE"
+else
+  die "Either GITHUB_APP_PEM (inline PEM data) or GITHUB_APP_PEM_FILE (path to PEM file) must be set"
+fi
+
+cleanup() { [[ -n "$_CLEANUP_PEM_FILE" ]] && rm -f "$_CLEANUP_PEM_FILE"; }
+trap cleanup EXIT
 
 for cmd in openssl curl jq gh; do
   command -v "$cmd" >/dev/null 2>&1 || die "Required command not found: $cmd"

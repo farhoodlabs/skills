@@ -13,7 +13,10 @@ Generate a short-lived GitHub App installation token and authenticate `gh`.
 |---|---|
 | `GITHUB_APP_ID` | Numeric App ID from GitHub App settings |
 | `GITHUB_APP_INSTALLATION_ID` | Numeric Installation ID for the target org/user |
-| `GITHUB_APP_PEM_FILE` | Absolute path to the App's PEM private key file |
+| `GITHUB_APP_PEM_FILE` | Absolute path to the App's PEM private key file *(one of `GITHUB_APP_PEM` or `GITHUB_APP_PEM_FILE` required)* |
+| `GITHUB_APP_PEM` | Raw PEM private key content as an env var *(one of `GITHUB_APP_PEM` or `GITHUB_APP_PEM_FILE` required)* |
+
+`GITHUB_APP_PEM` takes precedence over `GITHUB_APP_PEM_FILE` when both are set. Using `GITHUB_APP_PEM` avoids the need to write the key to disk ahead of time — it is written to a temp file with `chmod 600` and deleted after token generation.
 
 ## Usage
 
