@@ -17,6 +17,7 @@ Each skill follows this convention:
 ## Current Skills
 
 - **`github-app-token`** — Generates a short-lived GitHub App installation access token, writes it to `.gh-token` under `$GH_CONFIG_DIR` (preferred) or `$AGENT_HOME` (fallback), and authenticates the `gh` CLI. Requires `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, and one of `GITHUB_APP_PEM` (inline PEM) or `GITHUB_APP_PEM_FILE` (path). Depends on `openssl`, `curl`, `jq`, `gh`.
+- **`kubernetes-reflector`** — Documents Kubernetes Reflector annotations for mirroring secrets and configmaps across namespaces. Documentation only — no scripts.
 - **`minimax-image-generation`** — Generates images from MiniMax's `image-01` model via `/v1/image_generation`. Requires `MINIMAX_API_KEY`; `MINIMAX_API_BASE_URL` is optional. Depends on `curl`, `jq`, `base64`.
 
 ## Key Patterns

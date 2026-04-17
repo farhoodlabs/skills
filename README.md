@@ -7,6 +7,7 @@ A collection of Claude Code skills — reusable tools that extend Claude Code's 
 | Skill | What it does |
 |---|---|
 | [`github-app-token`](./github-app-token) | Generate a short-lived GitHub App installation access token and authenticate the `gh` CLI with it. |
+| [`kubernetes-reflector`](./kubernetes-reflector) | Reference for Kubernetes Reflector annotations that mirror secrets and configmaps across namespaces. |
 | [`minimax-image-generation`](./minimax-image-generation) | Generate images from MiniMax's `image-01` model via the `/v1/image_generation` endpoint. |
 
 ## Skill layout
